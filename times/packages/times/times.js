@@ -4,6 +4,31 @@
 
 const defaultCities = 'delhi, rome, new york, los angeles';
 
+const KNOWN_ZONES = {
+  'Noida': {
+    locale: 'en-US',
+    tz: 'Asia/Kolkata'
+  },
+  'Bangalore':  {
+    locale: 'en-US',
+    tz: 'Asia/Kolkata'
+  },
+  'Rome': {
+    locale: 'en-US',
+    tz: 'Europe/Rome'
+  },
+  'New York':  {
+    locale: 'en-US',
+    tz: 'America/New_York',
+    alias: 'ny'
+  },
+  'California':  {
+    locale: 'en-US',
+    tz: 'America/Los_Angeles',
+    alias: 'cali'
+  }
+}
+
 const worldClock1 = 'https://24timezones.com/current_world_time.php/';
 const worldClock2 = 'https://www.timeanddate.com/worldclock/full.html/';
 const axios = require('axios');
@@ -28,6 +53,16 @@ const abbrExpand = (shortName) => {
   }
   return longName;
 };
+
+Date.prototype.addHours = function(delta) {
+  this.setHours(this.getHours() + delta)
+  return this
+}
+
+Date.prototype.addMinutes = function(delta) {
+  this.setMinutes(this.getMinutes() + delta)
+  return this
+}
 
 const fail = (err, msg) => {
   console.log(err);
@@ -74,7 +109,51 @@ const success = (fields) => {
  * @return {Promise<SlackBodyType>} Response body
  */
 async function _command(params, commandText, secrets = {}) {
-  let response;
+  let deltaHours, deltaMinutes  
+  if(params.delta){
+  try {
+    // decimal values are ignored by parseInt
+    let delta = params.delta || '0'
+    delta = delta[0] === '.' ? `0${delta}` : delta
+    deltaHours = parseInt(delta)
+    deltaMinutes = parseInt((parseFloat(delta) - deltaHours) * 60)
+  } catch (e) {
+      return fail('Time offset must be an integer.')
+  }
+  }
+  let zoneFilter
+  if (params.zones && typeof params.zones === 'string') {
+    zoneFilter = params.zones.split(',').filter(_ => _.trim().length > 0).map(_ => _.trim().toLowerCase())
+    if (zoneFilter.length > 0) {
+      zoneFilter = new Set(zoneFilter)
+    }
+  
+    let worldtimes = Object
+      .entries(KNOWN_ZONES)
+      .filter(([city, {alias}]) => {
+        if (zoneFilter) {
+          return zoneFilter.has(city.toLowerCase()) || (alias && zoneFilter.has(alias.toLowerCase()))
+        } else return true
+      })
+      .map(([city, {locale, tz}]) => {
+        const t = new Date().addHours(deltaHours).addMinutes(deltaMinutes).toLocaleString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          weekday: 'short',
+          timeZone: tz })
+        return `${city}: ${t}`
+    })
+  
+    let result = worldtimes.length > 0 ? worldtimes.join('\n') : undefined;
+     return success(result)
+  
+  }
+
+  
+  
+  if(params.cities){
+    let response;
   try {
     response = await axios.get(worldClock1, {
       headers: {
@@ -124,6 +203,8 @@ async function _command(params, commandText, secrets = {}) {
   } catch (e) {
     return fail(e.message);
   }
+}
+
 }
 
 /**
