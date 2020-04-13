@@ -1,0 +1,10 @@
+sourceBasePath: https://raw.githubusercontent.com/nimbella/command-sets/master/devden/src
+commands:
+  translate:
+    news: /news.js
+    description: gets the news from hackernews
+    parameters:
+      - name: text
+        optional: false
+      - name: language
+        optional: true
