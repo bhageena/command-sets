@@ -16,44 +16,6 @@ let usStatesHtml;
 let inStatesData;
 let inDistrictData;
 
-const mui = (element, client) => {
-  if (client === 'mattermost') {
-    const output = [];
-    switch (element.type) {
-      case 'context': {
-        for (const item of element.elements) {
-          output.push(item.text.replace(/\*/g, '**'));
-        }
-        break;
-      }
-      case 'section': {
-        if (element.fields && element.fields.length > 0) {
-          for (const field of element.fields) {
-            output.push(field.text.replace(/\*/g, '**') + '\n');
-          }
-        } else if (element.text) {
-          output.push('#### ' + element.text.text.replace(/\*/g, '**'));
-        }
-        break;
-      }
-      case 'mrkdwn': {
-        output.push('#### ' + element.text.replace(/\*/g, '**'));
-        break;
-      }
-      case 'image': {
-        output.push(`![${element.alt_text}](${element.image_url})`);
-        break;
-      }
-      case 'divider': {
-        output.push('***');
-        break;
-      }
-    }
-    return output.join(' ');
-  }
-  return element;
-};
-
 const toTitleCase = (phrase) => phrase
   .toLowerCase()
   .split(' ')
@@ -264,7 +226,7 @@ const fail = (err, msg) => {
 };
 
 const success = (header, fields, footer, client, country) => {
-  const response = {
+  let response = {
     response_type: 'in_channel',
     blocks: [
       mui({
@@ -311,12 +273,28 @@ const success = (header, fields, footer, client, country) => {
         text: footer,
       })
   }
-  response.blocks.push(mui(body, client))
-  if(country) response.blocks.push(mui(chart, client))
-  response.blocks.push(mui(lower, client))
+  response.blocks.push(body)
+  if(country) response.blocks.push(chart)
+  response.blocks.push(lower, client)
+
   if (client === 'mattermost') {
-    response.text = response.blocks.join('\n');
-    delete response.blocks;
+    const response = {
+      attachments: [
+        {
+          pretext: header,
+          fields: [],
+          image_url: `https://raichand-8kehpaun1bf-apigcp.nimbella.io/countries/${encodeURI(country)}.png?${new Date().getTime()}`,
+          footer: footer
+        }
+      ]      
+    }
+    for (const property in fields) {
+      response.attachments[0].fields.push({
+        short:false,
+        title: property,
+        value: (fields[property] || 0),
+      });
+    }
   }
   return response;
 };
